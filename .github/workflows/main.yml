@@ -25,9 +25,9 @@ jobs:
       # Runs a set of commands using the runners shell
       - name: Install zola
         run: |
-          curl -s -L https://github.com/getzola/zola/releases/download/v0.10.1/zola-v0.10.1-x86_64-unknown-linux-gnu.tar.gz
+          curl -s -L https://github.com/getzola/zola/releases/download/v0.12.0/zola-v0.12.0-x86_64-unknown-linux-gnu.tar.gz |\
           sudo tar xvzf - -C /usr/local/bin
-        
+
       # Runs a single command using the runners shell
       - name: Build website
         run: zola build
