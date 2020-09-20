@@ -31,3 +31,9 @@ jobs:
       # Runs a single command using the runners shell
       - name: Build website
         run: zola build
+
+      - name: Deploy
+        uses: hadjilucasL/blog
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
