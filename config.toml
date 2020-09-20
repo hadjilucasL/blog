@@ -1,7 +1,7 @@
 title = "hadjilucasL's blog posts"
 description = "The sharings of a gallus domesticus 🐔"
 
-base_url = "https://hadjilucasL.github.io/blog"
+base_url = "https://hadjilucasL.github.io"
 build_search_index = false
 compile_sass = true
 default_language = "en"
@@ -16,7 +16,7 @@ taxonomies = [
 
 [extra]
 after_dark_menu = [
-    {name = "Blog", url = "$BASE_URL/"},
+    {name = "Blog", url = "$BASE_URL"},
     {name = "Code", url = "https://github.com/hadjilucasL"},
 ]
 after_dark_title = "The sharings of a gallus domesticus 🐔"
