@@ -1,0 +1,22 @@
+title = "hadjilucasL's blog posts"
+description = "The sharings of a gallus domesticus 🐔"
+
+base_url = "https://hadjilucasL.github.io/blog"
+build_search_index = false
+compile_sass = true
+default_language = "en"
+generate_rss = true
+highlight_code = true
+highlight_theme = "monokai"
+theme = "after-dark"
+taxonomies = [
+    {name = "categories", rss = true },
+    {name = "tags", rss = true },
+]
+
+[extra]
+after_dark_menu = [
+    {name = "Blog", url = "$BASE_URL/"},
+    {name = "Code", url = "https://github.com/hadjilucasL"},
+]
+after_dark_title = "The sharings of a gallus domesticus 🐔"
