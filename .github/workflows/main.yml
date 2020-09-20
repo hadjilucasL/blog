@@ -33,7 +33,7 @@ jobs:
         run: zola build
 
       - name: Deploy
-        uses: hadjilucasL/blog
+        uses: hadjilucasL/blog@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
