@@ -29,3 +29,5 @@ After a but of googling, it was solved by the following terminal commands:
 echo Y | sudo tee /sys/module/usbcore/parameters/use_both_schemes
 echo Y | sudo tee /sys/module/usbcore/parameters/old_scheme_first
 ```
+
+![TEAC AI-101DA](teac_ai_101da.jpeg)
