@@ -1,7 +1,7 @@
 title = "hadjilucasL's blog posts"
 description = "The sharings of a gallus domesticus 🐔"
 
-base_url = "https://hadjilucasL.github.io/blog"
+base_url = "https://www.gallus-domesticus.com"
 build_search_index = false
 compile_sass = true
 default_language = "en"
