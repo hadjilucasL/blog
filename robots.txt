@@ -1,0 +1,2 @@
+User-agent: *
+Sitemap: https://www.gallus-domesticus.com/blog/sitemap.xml
