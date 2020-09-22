@@ -1,5 +1,5 @@
 title = "hadjilucasL's blog posts"
-description = "The sharings of a gallus domesticus 🐔"
+description = "The sharings of a gallus gallus domesticus 🐔"
 
 base_url = "https://www.gallus-domesticus.com/blog"
 build_search_index = false
@@ -20,4 +20,4 @@ after_dark_menu = [
     {name = "Code", url = "https://github.com/hadjilucasL"},
     {name = "Home", url = "https://www.gallus-domesticus.com"},
 ]
-after_dark_title = "The sharings of a gallus domesticus 🐔"
+after_dark_title = "The sharings of a gallus gallus domesticus 🐔"

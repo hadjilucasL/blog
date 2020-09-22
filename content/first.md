@@ -1,6 +1,6 @@
 +++
 title = "56k Party"
-date = 2020-09-20
+date = 2020-09-19
 [taxonomies]
 tags = ["misc"]
 +++
