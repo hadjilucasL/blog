@@ -42,7 +42,7 @@ a lot of references to localhost (127.0.0.1) instead of referencing containers b
 First login to the Seafile private registry and all necessary docker images.
 You can try using the latest elasticsearch container but this was the version used in the docker compose yaml 
 provided by Seafile.
-```shell
+```bash
 podman login -u seafile -p <see-link-above> docker.seadrive.org
 
 podman pull docker.io/library/mariadb
@@ -57,13 +57,13 @@ podman pull docker.io/seafileltd/seafile-mc:latest   # community edition image
 Then create a pod, named 'seafile', and expose the ports for Seahub (port 8000, the web gui) 
 and Seafile file server api (port 8082, used to download/upload files in the gui and desktop clients).
 I am exposing these this since I am bypassing the build in nginx server later on as I use my own reverse proxy (SWAG).
-```shell
+```bash
 podman pod create -p 65080:8000 -p 65082:8082 --name seafile
 ```
 
 If you would like to keep their own nginx then you can expose only port 80 (http) or 443 (https) by altering 
 the command as follows: 
-```shell
+```bash
 podman pod create -p 65080:80 -p 65443:443 --name seafile 
 ```
 
@@ -72,7 +72,7 @@ podman pod create -p 65080:80 -p 65443:443 --name seafile
 The last directory will contain also all your files, so you can choose to place this 
 somewhere where you have plenty of disk space.
 
-```shell
+```bash
 mkdir -p /opt/seafile-db/mysql
 mkdir -p /opt/seafile-elasticsearch/data
 mkdir -p /opt/seafile-office-preview
@@ -91,7 +91,7 @@ Without these I would get permission issues within the container but your mileag
 More information on the volume options can be found in the
 [podman documentation](https://docs.podman.io/en/latest/markdown/podman-run.1.html#volume-v-source-volume-host-dir-container-dir-options).
 
-```shell
+```bash
 podman create \
   --pod seafile \
   --name seafile-db \
@@ -103,7 +103,7 @@ podman create \
 
 ### Memcached
 Create memcached container in our 'seafile' pod and set the server to use 256 megabytes of RAM for item storage.  
-```shell
+```bash
 podman create \
   --pod seafile \
   --name seafile-memcached \
@@ -118,7 +118,7 @@ and have open many files at a time.
 
 This is only used in the Professional version.
 
-```shell
+```bash
 podman create \
   --pod seafile \
   --name seafile-elasticsearch \
@@ -134,7 +134,7 @@ podman create \
 To get this container working I also had to change the owner of the source volume directory to
 the user with id 1000. I think this has something to do with the way the container sets the UID/GID.. but
 you can try to mount with the 'U' option as used in the MariaDB container. I didn't have time to try that.
-```shell
+```bash
 chown -R 1000.1000 /opt/seafile-elasticsearch
 ```
 
@@ -163,7 +163,7 @@ root             soft    memlock        unlimited
 Seafile Professional supports previewing office documents, such as .doc and .xlx, in the webgui by converting them to PDF.
 To support this you need to setup the office preview container. The container needs to expose it's service, on port 8089,
 so that it can be reached by the main Seafile container.
-```shell
+```bash
 podman create \
   --pod seafile \
   --name seafile-office-preview \
@@ -179,7 +179,7 @@ For a list of tz database time zones see [this helpful wikipedia page](https://e
 
 Make sure that the source volume, in this case `/opt/seafile-data`, is on a location that has enough space for your files.
 
-```shell
+```bash
 podman create \
   --pod seafile \
   --name seafile-seafile \
@@ -202,18 +202,18 @@ Phew! Hopefully all commands run without a hiccup, and we are ready to launch.
 First start the containers supporting the main seafile service (seafile-seafile container). To be honest I also launched
 them all at once and didn't really have an issue - but this way you can see if any of the supporting ones have any issues.
 
-```shell
+```bash
 podman start seafile-memcached seafile-db seafile-elasticsearch
 ```
 
 If no issues then start the main seafile service 
-```shell
+```bash
 podman start seafile-seafile
 ```
 
 ### Deploy with systemd
 
-```shell
+```bash
 mkdir ~/seafile && cd ~/seafile
 podman generate systemd --new --files --name seafile
 mv *.service /etc/systemd/system/
@@ -384,6 +384,6 @@ CNAME record to point `my-seafile.my-domain.com` subdomain to `my-domain.com`, i
 ## General commands
 
 #### Open a shell in a running container by name
-```shell
+```bash
 podman exec -it seafile-office-preview /bin/bash
 ```
