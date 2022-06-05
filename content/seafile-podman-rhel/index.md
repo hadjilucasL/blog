@@ -113,9 +113,8 @@ podman create \
 ```
 
 ### Elasticsearch
-Create elasticsearch container and allow it to use up to 2GB of memory. 
-The ulimit changes are important as this container can use a lot of memory,
-and have open many files at a time.
+Create elasticsearch container.
+The ulimit changes are important as this container can use a lot of memory, 2GB with the current settings, and have many open files at a time.
 
 This is only used in the Professional version.
 
