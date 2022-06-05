@@ -8,6 +8,7 @@ tags = ["linux", "self-hosted", "storage", "podman", "docker"]
 > **⚠ WARNING: This post is still under construction.**  
 > Hopefully will have time to finish it off soon.
 > 
+> 
 Jubilee weekend here in the UK (yayy 🥳) so I had time to experiment with a couple of file-hosting systems.
 
 I was looking into Nextcloud but browsing through Reddit I saw [Seafile](https://www.seafile.com)
@@ -43,7 +44,7 @@ First login to the Seafile private registry and all necessary docker images.
 You can try using the latest elasticsearch container but this was the version used in the docker compose yaml 
 provided by Seafile.
 ```bash
-podman login -u seafile -p <see-link-above> docker.seadrive.org
+podman login -u seafile -p <see-link-above-for-password> docker.seadrive.org
 
 podman pull docker.io/library/mariadb
 podman pull docker.io/library/memcached
