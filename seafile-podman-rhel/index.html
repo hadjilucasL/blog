@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+      <!-- Enable responsiveness on mobile devices-->
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    
+      
+      <meta name="description" content="The sharings of a gallus gallus domesticus 🐔" />
+      
+    
+
+      <title>hadjilucasL&#x27;s blog posts</title>
+
+      
+
+      
+          <link rel="stylesheet" href="https://www.gallus-domesticus.com/blog/site.css">
+      
+
+      
+      
+    </head>
+
+    <body class="hack dark main container">
+        
+    
+        
+                
+                    <header>
+                        <nav itemscope itemtype="http://schema.org/SiteNavigationElement">
+                        
+                            <a itemprop="url"
+                               class=""
+                               href="https://www.gallus-domesticus.com/blog/">
+                                <span itemprop="name">Blog</span></a>
+                        
+                            <a itemprop="url"
+                               class=""
+                               href="https://github.com/hadjilucasL">
+                                <span itemprop="name">Code</span></a>
+                        
+                            <a itemprop="url"
+                               class=""
+                               href="https://www.gallus-domesticus.com">
+                                <span itemprop="name">Home</span></a>
+                        
+                        </nav>
+                    </header>
+                
+            
+    
+
+<article itemscope itemtype="http://schema.org/BlogPosting">
+    <header>
+        <h1 itemprop="headline">Deploy Seafile with Podman (in RHEL) behind SWAG &amp; Authelia</h1>
+        <span class="muted">
+    <svg class="icon i-clock" viewBox="0 0 32 32"
+         width="16" height="16" fill="none" stroke="currentcolor"
+         stroke-linecap="round" stroke-linejoin="round" stroke-width="6.25%">
+        <circle cx="16" cy="16" r="14"/>
+        <path d="M16 8 L16 16 20 20"/>
+    </svg>
+    <span>9 minute read</span>
+    <svg class="icon i-edit" viewBox="0 0 32 32"
+         width="16" height="16" fill="none" stroke="currentcolor"
+         stroke-linecap="round" stroke-linejoin="round" stroke-width="6.25%">
+        <path d="M30 7 L25 2 5 22 3 29 10 27 Z M21 6 L26 11 Z M5 22 L10 27 Z"/>
+    </svg>
+
+    Published: 2022-06-05
+</span>
+    </header>
+    <div itemprop="articleBody">
+      <blockquote>
+<p><strong>⚠ WARNING: This post is still under construction.</strong><br />
+Hopefully will have time to finish it off soon.</p>
+</blockquote>
+<p>Jubilee weekend here in the UK (yayy 🥳) so I had time to experiment with a couple of file-hosting systems.</p>
+<p>I was looking into Nextcloud but browsing through Reddit I saw <a href="https://www.seafile.com">Seafile</a>
+being recommended. So decided to try it out on a test RHEL 8 vm instance.  This post covers both the professional 
+and community editions of Seafile.</p>
+<span id="continue-reading"></span>
+<p>As I recently found out, Docker has been replaced by <a href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html-single/building_running_and_managing_containers/index">Podman</a> 
+and docker-compose by <a href="https://developers.redhat.com/blog/2019/01/15/podman-managing-containers-pods">podman pods</a> 
+in the Redhat ecosystem.</p>
+<p>There are probably several good posts on the advantages of switching from docker to podman but from a quick read 
+the pros focus around security, as it allows you to run/debug containers rootless and deamonless. It also plays well with
+systemd as we will see later.</p>
+<p>The Seafile developers have <a href="https://manual.seafile.com/docker/pro-edition/deploy_seafile_pro_with_docker/">provided</a> 
+several docker compose yaml files so it took some effort and help from <a href="https://forum.seafile.com/t/seafile-with-podman/12815">this post</a> 
+to translate them to podman commands.</p>
+<p>The credentials for the Seafile private docker registry can be found <a href="https://customer.seafile.com/downloads/">here</a> 
+at the time of writing. </p>
+<p>Anyway, to business! Here are the commands to pull the docker images and setup a seafile pod with all the necessary containers.
+The professional version includes both Elasticsearch, for full text search in files and the <a href="https://manual.seafile.com/deploy_pro/office_documents_preview/">office preview</a>
+component.</p>
+<p>Caveat: I didn't have time to properly investigate the most optimal network setup for the containers, so you will see 
+a lot of references to localhost (127.0.0.1) instead of referencing containers by name or using unix sockets.</p>
+<h3 id="pull-the-docker-images">Pull the docker images</h3>
+<p>First login to the Seafile private registry and all necessary docker images.
+You can try using the latest elasticsearch container but this was the version used in the docker compose yaml 
+provided by Seafile.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman login -u seafile -p &lt;see-link-above-for-password&gt; docker.seadrive.org
+
+podman pull docker.io&#x2F;library&#x2F;mariadb
+podman pull docker.io&#x2F;library&#x2F;memcached
+podman pull docker.io&#x2F;library&#x2F;elasticsearch:7.16.2
+podman pull docker.io&#x2F;seafileltd&#x2F;office-preview
+podman pull docker.seadrive.org&#x2F;seafileltd&#x2F;seafile-pro-mc
+podman pull docker.io&#x2F;seafileltd&#x2F;seafile-mc:latest   # community edition image
+</code></pre>
+<h3 id="create-the-pod-hosting-the-containers">Create the pod hosting the containers</h3>
+<p>Then create a pod, named 'seafile', and expose the ports for Seahub (port 8000, the web gui) 
+and Seafile file server api (port 8082, used to download/upload files in the gui and desktop clients).
+I am exposing these this since I am bypassing the build in nginx server later on as I use my own reverse proxy (SWAG).</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman pod create -p 65080:8000 -p 65082:8082 --name seafile
+</code></pre>
+<p>If you would like to keep their own nginx then you can expose only port 80 (http) or 443 (https) by altering 
+the command as follows: </p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman pod create -p 65080:80 -p 65443:443 --name seafile 
+</code></pre>
+<h3 id="create-mount-points-for-the-containers">Create mount points for the containers</h3>
+<p>The last directory will contain also all your files, so you can choose to place this 
+somewhere where you have plenty of disk space.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">mkdir -p &#x2F;opt&#x2F;seafile-db&#x2F;mysql
+mkdir -p &#x2F;opt&#x2F;seafile-elasticsearch&#x2F;data
+mkdir -p &#x2F;opt&#x2F;seafile-office-preview
+mkdir -p &#x2F;opt&#x2F;seafile-data
+</code></pre>
+<h3 id="mariadb-mysql">MariaDB (MySQL)</h3>
+<p>Now lets create MariaDB container in our 'seafile' pod. 
+The volume option 'Z' informs Podman to label the content with a private unshared label. According to the podman docs, 
+labeling systems like SELinux  require that proper labels are placed on volume content mounted into a container. 
+Without a label, SELinux might prevent the processes running inside the container from using the content.
+Lastly the 'U' option tells Podman to use the correct host UID and GID based on the UID and GID within the container, 
+to change recursively the owner and group of the source volume.
+Without these I would get permission issues within the container but your mileage may vary.
+More information on the volume options can be found in the
+<a href="https://docs.podman.io/en/latest/markdown/podman-run.1.html#volume-v-source-volume-host-dir-container-dir-options">podman documentation</a>.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman create \
+  --pod seafile \
+  --name seafile-db \
+  -e MYSQL_ROOT_PASSWORD=&#x27;a-secure-password&#x27; \
+  -e MYSQL_LOG_CONSOLE=true \
+  -v &#x2F;opt&#x2F;seafile-db&#x2F;mysql:&#x2F;var&#x2F;lib&#x2F;mysql:Z,U \
+  mariadb
+</code></pre>
+<h3 id="memcached">Memcached</h3>
+<p>Create memcached container in our 'seafile' pod and set the server to use 256 megabytes of RAM for item storage.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman create \
+  --pod seafile \
+  --name seafile-memcached \
+  --entrypoint &#x27;[&quot;memcached&quot;, &quot;-m 256&quot;]&#x27; \
+  memcached
+</code></pre>
+<h3 id="elasticsearch">Elasticsearch</h3>
+<p>Create elasticsearch container.
+The ulimit changes are important as this container can use a lot of memory, 2GB with the current settings, and have many open files at a time.</p>
+<p>This is only used in the Professional version.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman create \
+  --pod seafile \
+  --name seafile-elasticsearch \
+  --memory 2g \
+   --ulimit nofile=65535:65535,memlock=-1:-1 \
+  -e discovery.type=single-node \
+  -e bootstrap.memory_lock=true \
+  -e &quot;ES_JAVA_OPTS=-Xms1g -Xmx1g&quot; \
+  -v &#x2F;opt&#x2F;seafile-elasticsearch&#x2F;data:&#x2F;usr&#x2F;share&#x2F;elasticsearch&#x2F;data \
+  elasticsearch:7.16.2
+</code></pre>
+<p>To get this container working I also had to change the owner of the source volume directory to
+the user with id 1000. I think this has something to do with the way the container sets the UID/GID.. but
+you can try to mount with the 'U' option as used in the MariaDB container. I didn't have time to try that.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">chown -R 1000.1000 &#x2F;opt&#x2F;seafile-elasticsearch
+</code></pre>
+<h4 id="note">Note</h4>
+<p>At one point I also tweaked the system resource limits for different users, 
+but I do not think this made a difference - especially after it is deployed as a service. 
+It was just me randomly copy-pasting from the web.
+Nevertheless, it's here for completeness.</p>
+<p>Open <code>/etc/security/limits.conf</code> and append at the end</p>
+<pre data-lang="text" class="language-text "><code class="language-text" data-lang="text">*                soft    nofile         1024000
+*                hard    nofile         1024000
+*                soft    memlock        unlimited
+*                hard    memlock        unlimited
+elastic          soft    nofile         1024000
+elastic          hard    nofile         1024000
+elastic          soft    memlock        unlimited
+elastic          hard    memlock        unlimited
+root             soft    nofile         1024000
+root             hard    nofile         1024000
+root             soft    memlock        unlimited
+</code></pre>
+<h3 id="office-preview">Office Preview</h3>
+<p>Seafile Professional supports previewing office documents, such as .doc and .xlx, in the webgui by converting them to PDF.
+To support this you need to setup the office preview container. The container needs to expose it's service, on port 8089,
+so that it can be reached by the main Seafile container.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman create \
+  --pod seafile \
+  --name seafile-office-preview \
+  -v &#x2F;opt&#x2F;seafile-office-preview:&#x2F;shared:U \
+  --entrypoint &#x27;[&quot;bash&quot;, &quot;start.sh&quot;]&#x27; \
+  --publish 8089:8089 \
+  seafileltd&#x2F;office-preview:latest
+</code></pre>
+<h3 id="seafile-container">Seafile Container</h3>
+<p>Now for the final step, let's create our Seafile container in seafile pod.
+For a list of tz database time zones see <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones">this helpful wikipedia page</a>.</p>
+<p>Make sure that the source volume, in this case <code>/opt/seafile-data</code>, is on a location that has enough space for your files.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman create \
+  --pod seafile \
+  --name seafile-seafile \
+  -v &#x2F;opt&#x2F;seafile-data:&#x2F;shared:U \
+  -e DB_HOST=127.0.0.1 \
+  -e DB_ROOT_PASSWD=&#x27;a-secure-password&#x27; \
+  -e TIME_ZONE=&#x27;Europe&#x2F;London&#x27; \
+  -e SEAFILE_ADMIN_EMAIL=&#x27;your-email@your-domain.com&#x27; \
+  -e SEAFILE_ADMIN_PASSWORD=&#x27;b-secure-password&#x27; \
+  -e SEAFILE_SERVER_LETSENCRYPT=false \
+  -e SEAFILE_SERVER_HOSTNAME=&#x27;my-seafile.my-domain.com&#x27; \
+  docker.seadrive.org&#x2F;seafileltd&#x2F;seafile-pro-mc
+</code></pre>
+<p>For the community edition you can simply replace the last line with <code>seafileltd/seafile-mc</code>.</p>
+<h3 id="start-the-pod">Start the pod</h3>
+<p>Phew! Hopefully all commands run without a hiccup, and we are ready to launch.</p>
+<p>First start the containers supporting the main seafile service (seafile-seafile container). To be honest I also launched
+them all at once and didn't really have an issue - but this way you can see if any of the supporting ones have any issues.</p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman start seafile-memcached seafile-db seafile-elasticsearch
+</code></pre>
+<p>If no issues then start the main seafile service </p>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman start seafile-seafile
+</code></pre>
+<h3 id="deploy-with-systemd">Deploy with systemd</h3>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">mkdir ~&#x2F;seafile &amp;&amp; cd ~&#x2F;seafile
+podman generate systemd --new --files --name seafile
+mv *.service &#x2F;etc&#x2F;systemd&#x2F;system&#x2F;
+</code></pre>
+<pre><code>container-seafile-db.service
+container-seafile-elasticsearch.service
+container-seafile-memcached.service
+container-seafile-office-preview.service
+container-seafile-seafile.service
+pod-seafile.service
+</code></pre>
+<h3 id="allow-binding-to-seahub-seafile-file-server-from-outside-the-container">Allow binding to Seahub/Seafile file server from outside the container</h3>
+<p><code>/opt/seafile-data/seafile/conf/gunicorn.conf.py</code></p>
+<p>Change the line:</p>
+<pre data-lang="text" class="language-text "><code class="language-text" data-lang="text">bind = &quot;127.0.0.1:8000&quot;  (could also be localhost:8000)
+</code></pre>
+<p>to</p>
+<pre data-lang="text" class="language-text "><code class="language-text" data-lang="text">bind = &quot;0.0.0.0:8000&quot;
+</code></pre>
+<h3 id="elasticsearch-configuration">Elasticsearch configuration</h3>
+<p><code>/opt/seafile-data/seafile/conf/seafevents.conf</code></p>
+<pre data-lang="text" class="language-text "><code class="language-text" data-lang="text">[INDEX FILES]
+external_es_server = true
+es_host = 127.0.0.1
+es_port = 9200
+enabled = true
+interval = 10m
+</code></pre>
+<h3 id="ldap-configuration">LDAP Configuration</h3>
+<p>In this case I am using FreeIPA but you can change the BASE/USER_DN per your configuration.</p>
+<p><code>/opt/seafile-data/seafile/conf/ccnet.conf</code></p>
+<pre data-lang="text" class="language-text "><code class="language-text" data-lang="text">[LDAP]
+HOST = ldap:&#x2F;&#x2F;ldap.my-domain.com:389
+BASE = cn=users,cn=accounts,dc=my-domain,dc=com
+USER_DN = uid=admin,cn=users,cn=accounts,dc=my-domain,dc=com
+PASSWORD = c-secure-password
+LOGIN_ATTR = mail
+</code></pre>
+<h3 id="seahub-configuration">Seahub configuration</h3>
+<p><code>/opt/seafile-data/seafile/conf/seahub_settings.py</code></p>
+<pre data-lang="text" class="language-text "><code class="language-text" data-lang="text">SERVICE_URL = &quot;https:&#x2F;&#x2F;my-seafile.my-domain.com&#x2F;&quot;  &lt;-- change this to match your domain
+
+DATABASES = {
+ &lt; Do not change anything here &gt;
+}
+
+
+CACHES = {
+    &#x27;default&#x27;: {
+        &#x27;BACKEND&#x27;: &#x27;django_pylibmc.memcached.PyLibMCCache&#x27;,
+        &#x27;LOCATION&#x27;: &#x27;127.0.0.1:11211&#x27;, &lt;-- change this to point to 127.0.0.1
+    },
+    &#x27;locmem&#x27;: {
+        &#x27;BACKEND&#x27;: &#x27;django.core.cache.backends.locmem.LocMemCache&#x27;,
+    },
+}
+COMPRESS_CACHE_BACKEND = &#x27;locmem&#x27; 
+TIME_ZONE = &#x27;Europe&#x2F;London&#x27;
+FILE_SERVER_ROOT = &quot;https:&#x2F;&#x2F;my-seafile.my-domain.com&#x2F;seafhttp&quot;  &lt;-- change this to match your domain
+OFFICE_CONVERTOR_ROOT = &#x27;http:&#x2F;&#x2F;127.0.0.1:8089&#x27; &lt;-- change this to point to 127.0.0.1
+
+# Needed for authentication with Authelia to work
+ENABLE_REMOTE_USER_AUTHENTICATION = True
+REMOTE_USER_HEADER = &#x27;HTTP_REMOTE_USER&#x27;
+REMOTE_USER_CREATE_UNKNOWN_USER = True
+REMOTE_USER_DOMAIN = &#x27;my-domain.com&#x27;
+REMOTE_USER_ACTIVATE_USER_AFTER_CREATION = True
+</code></pre>
+<h3 id="authelia-rule-configuration">Authelia Rule Configuration</h3>
+<blockquote>
+<p><strong>⚠ WARNING: Not fully resolved but working.</strong></p>
+<p>After you authenticate with Authelia, you still get the Seafile login page.</p>
+<p>Just click the 'Single Sign-On' link on the login page and you will be logged in automatically. </p>
+</blockquote>
+<p>Bypass the file server api for the desktop client to work properly.</p>
+<p><code>/config/configuration.yml</code></p>
+<pre data-lang="yaml" class="language-yaml "><code class="language-yaml" data-lang="yaml">  rules:
+    - domain: my-seafile.my-domain.com
+      resources:
+        - &quot;^&#x2F;seafhttp&#x2F;.*$&quot;
+        - &quot;^&#x2F;api.*$&quot;
+      policy: bypass
+    - domain: my-seafile.my-domain.com
+      policy: one_factor
+</code></pre>
+<h3 id="swag-nginx-configuration">SWAG Nginx configuration</h3>
+<p>To route https://my-seafile.my-domain.com to the correct destination.</p>
+<p><code>/config/nginx/proxy-confs/seafile.subdomain.conf</code></p>
+<pre data-lang="text" class="language-text "><code class="language-text" data-lang="text">server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name my-seafile.*;
+
+    include &#x2F;config&#x2F;nginx&#x2F;ssl.conf;
+
+    client_max_body_size 0;
+
+    # enable for Authelia
+    include &#x2F;config&#x2F;nginx&#x2F;authelia-server.conf;
+
+    location &#x2F; {
+        # enable for Authelia
+        include &#x2F;config&#x2F;nginx&#x2F;authelia-location.conf;
+
+        include &#x2F;config&#x2F;nginx&#x2F;proxy.conf;
+        include &#x2F;config&#x2F;nginx&#x2F;resolver.conf;
+        
+        set $upstream_app your-server-ip-address;               &lt;--- need to set this
+        set $upstream_port 65080;
+        set $upstream_proto http;
+        proxy_pass $upstream_proto:&#x2F;&#x2F;$upstream_app:$upstream_port;
+
+    }
+
+    location &#x2F;seafhttp {        
+        rewrite ^&#x2F;seafhttp(.*)$ $1 break;
+        
+        include &#x2F;config&#x2F;nginx&#x2F;authelia-location.conf;
+        
+        include &#x2F;config&#x2F;nginx&#x2F;proxy.conf;
+        include &#x2F;config&#x2F;nginx&#x2F;resolver.conf;
+        
+        proxy_pass http:&#x2F;&#x2F;your-server-ip-address:65082;            &lt;--- need to set this
+   }
+
+}
+</code></pre>
+<h3 id="setup-the-dns-record-for-the-subdomain">Setup the DNS record for the subdomain</h3>
+<p>CNAME record to point <code>my-seafile.my-domain.com</code> subdomain to <code>my-domain.com</code>, if <code>my-domain.com</code> is where your reverse proxy (SWAG) is hosted on. </p>
+<h2 id="general-commands">General commands</h2>
+<h4 id="open-a-shell-in-a-running-container-by-name">Open a shell in a running container by name</h4>
+<pre data-lang="bash" class="language-bash "><code class="language-bash" data-lang="bash">podman exec -it seafile-office-preview &#x2F;bin&#x2F;bash
+</code></pre>
+
+    </div>
+
+    
+        <footer>
+            <hr>
+            <p>
+                
+                
+                
+                    
+                    tagged
+                    
+                        <a href="https://www.gallus-domesticus.com/blog/tags/linux/">linux</a>
+                        
+                            
+                                
+                                    ,
+                                
+                            
+                        
+                    
+                        <a href="https://www.gallus-domesticus.com/blog/tags/self-hosted/">self-hosted</a>
+                        
+                            
+                                
+                                    ,
+                                
+                            
+                        
+                    
+                        <a href="https://www.gallus-domesticus.com/blog/tags/storage/">storage</a>
+                        
+                            
+                                
+                                    ,
+                                
+                            
+                        
+                    
+                        <a href="https://www.gallus-domesticus.com/blog/tags/podman/">podman</a>
+                        
+                            
+                                
+                                    and
+                                
+                            
+                        
+                    
+                        <a href="https://www.gallus-domesticus.com/blog/tags/docker/">docker</a>
+                        
+                            
+                        
+                    
+                
+            </p>
+            
+            
+        </footer>
+    
+</article>
+
+
+    </body>
+
+</html>
